@@ -1,0 +1,57 @@
+*This is not a dockerfile but steps to follow on a golang:1.11.5-alpine images*
+
+1) Build the golang alpine image using `FROM golang:1.11.5-alpine` in Dockerfile
+2) Access to sh: `dco run app bash`
+3) Execute steps described below:
+
+```
+cd ..
+apk --no-cache add \
+	curl \
+	python \
+	py-crcmod \
+	bash \
+	libc6-compat \
+	openssh-client \
+	git \
+	gnupg
+
+curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-233.0.0-linux-x86_64.tar.gz
+
+tar xzf google-cloud-sdk-233.0.0-linux-x86_64.tar.gz
+
+./google-cloud-sdk/install.sh
+
+exec bash
+
+rm google-cloud-sdk-233.0.0-linux-x86_64.tar.gz
+
+apk --update add openjdk7-jre
+
+gcloud beta emulators pubsub start
+
+4) Commit the container: `docker commit container_id juanramoncg/golang-gcloud:golang1.11.5-alpine-gcloud233.0.0`
+5) Use the built image:
+
+```
+FROM juanramoncg/golang-gcloud:golang1.11.5-alpine-gcloud233.0.0
+
+RUN apk update && apk add make git dep dumb-init build-base
+
+ENV DIR ${GOPATH}/src/app
+
+RUN mkdir -p ${DIR}
+WORKDIR ${DIR}
+
+COPY ./app ${DIR}/app
+COPY ./db ${DIR}/db
+COPY ./Makefile ${DIR}/Makefile
+COPY ./charts ${DIR}/charts
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+
+RUN make dep
+RUN go get -u github.com/gobuffalo/packr/v2/packr2
+
+CMD ["make", "dev"]
+```
